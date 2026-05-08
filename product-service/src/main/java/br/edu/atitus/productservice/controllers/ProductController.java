@@ -1,5 +1,7 @@
 package br.edu.atitus.productservice.controllers;
 
+import br.edu.atitus.productservice.clients.CurrencyClient;
+import br.edu.atitus.productservice.clients.CurrencyResponse;
 import br.edu.atitus.productservice.dtos.ProductDTO;
 import br.edu.atitus.productservice.entities.ProductEntity;
 import br.edu.atitus.productservice.repositories.ProductRepository;
@@ -11,12 +13,13 @@ import org.springframework.web.bind.annotation.*;
 public class ProductController {
 
     private final ProductRepository productRepository;
-
+    private final CurrencyClient currencyClient;
     @Value("${server.port}")
     private String serverPort;
 
-    public ProductController(ProductRepository productRepository) {
+    public ProductController(ProductRepository productRepository, CurrencyClient currencyClient) {
         this.productRepository = productRepository;
+        this.currencyClient = currencyClient;
     }
 
     @GetMapping("/{productId}")
@@ -24,12 +27,22 @@ public class ProductController {
             @PathVariable Long productId,
             @RequestParam String targetCurrency
     ) throws Exception {
+        Double convertedPrice = null;
 
+        String environment = "Product-service running on port: " + serverPort;
+        String requestCurrency = targetCurrency;
         ProductEntity entity = productRepository.findById(productId)
                 .orElseThrow(() -> new Exception("Product not found"));
 
         String serviceInfo = "Product-service running on Port: " + serverPort;
 
+        if (targetCurrency.equals(entity.getCurrency())) {
+            convertedPrice = entity.getPrice();
+        } else {
+            CurrencyResponse currency = currencyClient.getCurrency(entity.getCurrency(), targetCurrency);
+            convertedPrice = entity.getPrice() * currency.conversionRate();
+            environment = environment + " - " + currency.environment();
+        }
         return new ProductDTO(
                 entity.getId(),
                 entity.getDescription(),
@@ -39,7 +52,7 @@ public class ProductController {
                 entity.getCurrency(),
                 entity.getStock(),
                 serviceInfo,
-                null,
+                convertedPrice,
                 targetCurrency
         );
     }
