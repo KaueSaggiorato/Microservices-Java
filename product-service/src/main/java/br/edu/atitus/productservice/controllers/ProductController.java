@@ -6,6 +6,7 @@ import br.edu.atitus.productservice.dtos.ProductDTO;
 import br.edu.atitus.productservice.entities.ProductEntity;
 import br.edu.atitus.productservice.repositories.ProductRepository;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.CacheManager;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -14,12 +15,15 @@ public class ProductController {
 
     private final ProductRepository productRepository;
     private final CurrencyClient currencyClient;
+    private final CacheManager cacheManager;
+
     @Value("${server.port}")
     private String serverPort;
 
-    public ProductController(ProductRepository productRepository, CurrencyClient currencyClient) {
+    public ProductController(ProductRepository productRepository, CurrencyClient currencyClient, CacheManager cacheManager) {
         this.productRepository = productRepository;
         this.currencyClient = currencyClient;
+        this.cacheManager = cacheManager;
     }
 
     @GetMapping("/{productId}")
@@ -39,9 +43,18 @@ public class ProductController {
         if (targetCurrency.equals(entity.getCurrency())) {
             convertedPrice = entity.getPrice();
         } else {
-            CurrencyResponse currency = currencyClient.getCurrency(entity.getCurrency(), targetCurrency);
-            convertedPrice = entity.getPrice() * currency.conversionRate();
-            environment = environment + " - " + currency.environment();
+            String nameCache = "ConvertedValue";
+            String keyCache = entity.getCurrency() + "-" + targetCurrency;
+            Double convertedValue = cacheManager.getCache(nameCache).get(keyCache, Double.class);
+            if (convertedValue == null) {
+                CurrencyResponse currency = currencyClient.getCurrency(entity.getCurrency(), targetCurrency);
+                convertedPrice = entity.getPrice() * currency.conversionRate();
+                environment = environment + " - " + currency.environment();
+                cacheManager.getCache(nameCache).put(keyCache,currency.conversionRate());
+            }else{
+                convertedPrice = convertedValue * entity.getPrice();
+                environment = environment + " - Currency in cache " ;
+            }
         }
         return new ProductDTO(
                 entity.getId(),
