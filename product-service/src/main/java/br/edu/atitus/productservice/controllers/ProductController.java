@@ -46,14 +46,19 @@ public class ProductController {
             String nameCache = "ConvertedValue";
             String keyCache = entity.getCurrency() + "-" + targetCurrency;
             Double convertedValue = cacheManager.getCache(nameCache).get(keyCache, Double.class);
-            if (convertedValue == null) {
+            if (convertedValue == null){
                 CurrencyResponse currency = currencyClient.getCurrency(entity.getCurrency(), targetCurrency);
-                convertedPrice = entity.getPrice() * currency.conversionRate();
-                environment = environment + " - " + currency.environment();
-                cacheManager.getCache(nameCache).put(keyCache,currency.conversionRate());
-            }else{
+                if (currency != null) {
+                    convertedPrice = currency.conversionRate() * entity.getPrice();
+                    environment = environment + " - " + currency.environment();
+                    cacheManager.getCache(nameCache).put(keyCache, currency.conversionRate());
+                } else {
+                    convertedPrice = -1.0;
+                    environment = environment + " - Currency Fallback";
+                }
+            } else {
                 convertedPrice = convertedValue * entity.getPrice();
-                environment = environment + " - Currency in cache " ;
+                environment = environment + " - Currency in cache";
             }
         }
         return new ProductDTO(
