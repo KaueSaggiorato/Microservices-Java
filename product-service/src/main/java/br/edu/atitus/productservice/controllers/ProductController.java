@@ -8,6 +8,7 @@ import br.edu.atitus.productservice.repositories.ProductRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.CacheManager;
 import org.springframework.web.bind.annotation.*;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 
 @RestController
 @RequestMapping("products")
@@ -27,6 +28,7 @@ public class ProductController {
     }
 
     @GetMapping("/{productId}")
+    @CircuitBreaker(name = "CurrencyClientgetCurrencyStringString")
     public ProductDTO findProduct(
             @PathVariable Long productId,
             @RequestParam String targetCurrency
